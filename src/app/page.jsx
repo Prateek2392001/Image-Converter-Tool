@@ -7,7 +7,7 @@ import { UploadDropzone } from "@/components/upload/UploadDropzone";
 import { ImageGallery } from "@/components/gallery/ImageGallery";
 import { ToolPanel } from "@/components/tools/ToolPanel";
 import { Hero } from "@/components/home/Hero";
-import { processImage } from "@/lib/image-processing";
+import { processImage, generateFaviconPack } from "@/lib/image-processing";
 // import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
@@ -66,12 +66,17 @@ export default function Home() {
                     );
 
                     try {
-                        const blob = await processImage(file.file, {
-                            format: activeMode === "compress" ? "original" : settings.format,
-                            quality: settings.quality,
-                            scale: settings.scale / 100, // Convert 100% -> 1.0
-                            resize: settings.resize,
-                        });
+                        let blob;
+                        if (activeMode === "favicon") {
+                            blob = await generateFaviconPack(file.file);
+                        } else {
+                            blob = await processImage(file.file, {
+                                format: activeMode === "compress" ? "original" : settings.format,
+                                quality: settings.quality,
+                                scale: settings.scale / 100, // Convert 100% -> 1.0
+                                resize: settings.resize,
+                            });
+                        }
 
                         return {
                             id: file.id,
@@ -107,15 +112,23 @@ export default function Home() {
         const file = files.find((f) => f.id === id);
         if (file && file.processedBlob) {
             // Determine extension
+            // Determine extension
             let ext = "png";
-            if (settings.format !== "original") {
+            if (activeMode === "favicon") {
+                ext = "zip";
+            } else if (settings.format !== "original") {
                 ext = settings.format.split("/")[1];
             } else {
                 // Use original extension but maybe verify via MIME
                 ext = file.file.name.split(".").pop() || "png";
             }
 
-            saveAs(file.processedBlob, `processed_${file.file.name.split('.')[0]}.${ext}`);
+            let filename = `processed_${file.file.name.split('.')[0]}.${ext}`;
+            if (activeMode === "favicon") {
+                filename = `favicon_pack_${file.file.name.split('.')[0]}.zip`;
+            }
+
+            saveAs(file.processedBlob, filename);
         }
     };
 
@@ -127,7 +140,9 @@ export default function Home() {
 
         processedFiles.forEach((file) => {
             let ext = "png";
-            if (settings.format !== "original" && activeMode === "convert") {
+            if (activeMode === "favicon") {
+                ext = "zip";
+            } else if (settings.format !== "original" && activeMode === "convert") {
                 ext = settings.format.split("/")[1];
             } else {
                 ext = file.file.name.split(".").pop() || "png";
