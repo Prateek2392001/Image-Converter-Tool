@@ -34,7 +34,8 @@ export default async function getCroppedImg(
     pixelCrop,
     rotation = 0,
     flip = { horizontal: false, vertical: false },
-    shape = 'rect' // 'rect' or 'round'
+    shape = 'rect', // 'rect' or 'round'
+    outputSize = null // { width, height }
 ) {
     const image = await createImage(imageSrc)
     const canvas = document.createElement('canvas')
@@ -97,6 +98,24 @@ export default async function getCroppedImg(
         ctx.globalCompositeOperation = "source-over";
     }
 
+    // Resize if outputSize is provided
+    if (outputSize && outputSize.width && outputSize.height) {
+        const resizeCanvas = document.createElement('canvas');
+        resizeCanvas.width = outputSize.width;
+        resizeCanvas.height = outputSize.height;
+        const resizeCtx = resizeCanvas.getContext('2d');
+
+        // High quality scaling
+        resizeCtx.imageSmoothingEnabled = true;
+        resizeCtx.imageSmoothingQuality = 'high';
+
+        resizeCtx.drawImage(canvas, 0, 0, outputSize.width, outputSize.height);
+
+        return new Promise((resolve) => {
+            resizeCanvas.toBlob((blob) => resolve(blob), 'image/png');
+        });
+    }
+
     // Return as Blob
     return new Promise((resolve, reject) => {
         canvas.toBlob((blob) => {
@@ -113,29 +132,32 @@ export async function generateCanvasImage(
     aspectRatio, // width / height
     background = { type: 'color', value: '#ffffff' }, // or type: 'blur'
     padding = 0, // 0 to 1 (percentage of canvas dimension)
-    rotation = 0
+    rotation = 0,
+    customSize = null // { width, height }
 ) {
     const image = await createImage(imageSrc);
-    // Determine canvas size. We want high res.
-    // If aspect is 1 (square), utilize max dimension of image?
-    // Let's target at least 1080px short edge for high quality.
 
     let canvasWidth, canvasHeight;
 
-    // Base scale on image natural dimensions to avoid pixelation
-    // If image is 500x500 and user wants 1080x1080 canvas, we upscale? Yes.
-    // Or we stick to image logic.
-    // Let's use a standard "export" size base of 1920 or 1080.
-    const baseSize = Math.max(image.naturalWidth, image.naturalHeight, 1080);
-
-    if (aspectRatio >= 1) {
-        // Landscape or Square
-        canvasWidth = baseSize;
-        canvasHeight = baseSize / aspectRatio;
+    if (customSize && customSize.width && customSize.height) {
+        canvasWidth = parseInt(customSize.width);
+        canvasHeight = parseInt(customSize.height);
     } else {
-        // Portrait
-        canvasHeight = baseSize;
-        canvasWidth = baseSize * aspectRatio;
+        // Base scale on image natural dimensions to avoid pixelation
+        // If image is 500x500 and user wants 1080x1080 canvas, we upscale? Yes.
+        // Or we stick to image logic.
+        // Let's use a standard "export" size base of 1920 or 1080.
+        const baseSize = Math.max(image.naturalWidth, image.naturalHeight, 1080);
+
+        if (aspectRatio >= 1) {
+            // Landscape or Square
+            canvasWidth = baseSize;
+            canvasHeight = baseSize / aspectRatio;
+        } else {
+            // Portrait
+            canvasHeight = baseSize;
+            canvasWidth = baseSize * aspectRatio;
+        }
     }
 
     // Round dimensions

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Cropper from "react-easy-crop";
-import { Upload, Download, RotateCw, ZoomIn, Image as ImageIcon, Smartphone, Laptop, Layout, Monitor, Instagram, Facebook, Twitter, Linkedin, Youtube, Grid, Circle, Maximize, Crop as CropIcon, Palette, Move, Layers, BoxSelect } from "lucide-react";
+import { Upload, Download, RotateCw, ZoomIn, Image as ImageIcon, Smartphone, Laptop, Layout, Monitor, Instagram, Facebook, Twitter, Linkedin, Youtube, Grid, Circle, Maximize, Crop as CropIcon, Palette, Move, Layers, BoxSelect, Lock, Unlock } from "lucide-react";
 import getCroppedImg, { generateCanvasImage } from "@/lib/crop-utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -39,6 +39,12 @@ export function ImageResizer() {
     const [fitBackground, setFitBackground] = useState({ type: "blur", value: "#ffffff" }); // { type: 'color'|'blur', value: string }
     const [fitPadding, setFitPadding] = useState(0.05); // 0 to 0.5
 
+    // Output Dimensions
+    const [outputWidth, setOutputWidth] = useState("");
+    const [outputHeight, setOutputHeight] = useState("");
+    const [lockAspectRatio, setLockAspectRatio] = useState(true);
+    const [mediaSize, setMediaSize] = useState({ width: 0, height: 0 });
+
     const canvasRef = useRef(null);
 
     const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
@@ -50,6 +56,13 @@ export function ImageResizer() {
             const file = e.target.files[0];
             const imageDataUrl = await readFile(file);
             setImageSrc(imageDataUrl);
+
+            // Get dimensions
+            const img = new Image();
+            img.onload = () => {
+                setMediaSize({ width: img.width, height: img.height });
+            };
+            img.src = imageDataUrl;
         }
     };
 
@@ -61,12 +74,58 @@ export function ImageResizer() {
         });
     };
 
+    const handleDimensionChange = (type, value) => {
+        const val = parseFloat(value);
+        if (isNaN(val)) {
+            if (type === 'w') setOutputWidth(value);
+            else setOutputHeight(value);
+            return;
+        }
+
+        if (type === 'w') {
+            setOutputWidth(val);
+            if (lockAspectRatio) {
+                // Calculate Height
+                let aspect = selectedPreset.aspect;
+                if (!aspect) {
+                    // Try to infer aspect from current crop or image
+                    if (mode === 'crop' && croppedAreaPixels) {
+                        aspect = croppedAreaPixels.width / croppedAreaPixels.height;
+                    } else {
+                        // Use media natural aspect if available
+                        aspect = (mediaSize.width && mediaSize.height) ? mediaSize.width / mediaSize.height : 1;
+                    }
+                }
+                setOutputHeight(Math.round(val / aspect));
+            }
+        } else {
+            setOutputHeight(val);
+            if (lockAspectRatio) {
+                // Calculate Width
+                let aspect = selectedPreset.aspect;
+                if (!aspect) {
+                    if (mode === 'crop' && croppedAreaPixels) {
+                        aspect = croppedAreaPixels.width / croppedAreaPixels.height;
+                    } else {
+                        // Use media natural aspect if available
+                        aspect = (mediaSize.width && mediaSize.height) ? mediaSize.width / mediaSize.height : 1;
+                    }
+                }
+                setOutputWidth(Math.round(val * aspect));
+            }
+        }
+    };
+
     const handleDownload = async () => {
         if (!imageSrc) return;
 
         setIsExporting(true);
         try {
             let blob;
+            const customSize = (outputWidth && outputHeight)
+                ? { width: parseInt(outputWidth), height: parseInt(outputHeight) }
+                : null;
+
             if (mode === "crop") {
                 if (!croppedAreaPixels) return;
                 blob = await getCroppedImg(
@@ -74,7 +133,8 @@ export function ImageResizer() {
                     croppedAreaPixels,
                     rotation,
                     { horizontal: false, vertical: false },
-                    selectedPreset.id === "circle" ? "round" : "rect"
+                    selectedPreset.id === "circle" ? "round" : "rect",
+                    customSize
                 );
             } else {
                 // Fit Mode Export
@@ -89,7 +149,8 @@ export function ImageResizer() {
                     aspectRatio,
                     fitBackground,
                     fitPadding,
-                    rotation
+                    rotation,
+                    customSize
                 );
             }
 
@@ -185,6 +246,43 @@ export function ImageResizer() {
                             </button>
                         );
                     })}
+                </div>
+
+
+                {/* Custom Size Inputs */}
+                <div className="p-4 bg-muted/40 rounded-lg border border-border mt-2">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Output Size</span>
+                        <button
+                            onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                            className={`p-1 rounded hover:bg-muted transition-colors ${lockAspectRatio ? "text-primary" : "text-muted-foreground"}`}
+                            title={lockAspectRatio ? "Unlock Aspect Ratio" : "Lock Aspect Ratio"}
+                        >
+                            {lockAspectRatio ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground font-medium uppercase">Width (px)</label>
+                            <input
+                                type="number"
+                                value={outputWidth}
+                                placeholder="Auto"
+                                onChange={(e) => handleDimensionChange('w', e.target.value)}
+                                className="w-full bg-background border border-border rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary outline-none"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-muted-foreground font-medium uppercase">Height (px)</label>
+                            <input
+                                type="number"
+                                value={outputHeight}
+                                placeholder="Auto"
+                                onChange={(e) => handleDimensionChange('h', e.target.value)}
+                                className="w-full bg-background border border-border rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary outline-none"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -359,6 +457,6 @@ export function ImageResizer() {
                     border-color: var(--primary) !important;
                 }
             `}</style>
-        </div>
+        </div >
     );
 }
