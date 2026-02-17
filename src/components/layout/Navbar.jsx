@@ -20,6 +20,18 @@ export function Navbar() {
           >
             Color Picker
           </Link>
+          <Link
+            href="/background-remover"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Background Remover
+          </Link>
+          <Link
+            href="/image-resizer"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Image Resizer
+          </Link>
         </div>
       </div>
     </nav>
