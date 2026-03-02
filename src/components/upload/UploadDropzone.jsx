@@ -4,16 +4,21 @@ import { useDropzone } from "react-dropzone";
 import { UploadCloud, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export function UploadDropzone({ onFilesAccepted, className }) {
+export function UploadDropzone({
+    onFilesAccepted,
+    className,
+    accept = { "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif"] },
+    title = "Drag & Drop Images",
+    activeTitle = "Drop images here",
+    description = "Supports PNG, JPG, WEBP, AVIF"
+}) {
     const { getRootProps, getInputProps, isDragActive, acceptedFiles } = useDropzone({
         onDrop: (accepted, rejected) => {
             if (accepted.length > 0) {
                 onFilesAccepted(accepted);
             }
         },
-        accept: {
-            "image/*": [".png", ".jpg", ".jpeg", ".webp", ".avif"],
-        }
+        accept
     });
 
     return (
@@ -36,7 +41,7 @@ export function UploadDropzone({ onFilesAccepted, className }) {
                     </div>
 
                     <h3 className="text-2xl font-bold font-heading">
-                        {isDragActive ? "Drop images here" : "Drag & Drop Images"}
+                        {isDragActive ? activeTitle : title}
                     </h3>
 
                     <p className="text-muted-foreground max-w-sm mx-auto">
@@ -44,7 +49,7 @@ export function UploadDropzone({ onFilesAccepted, className }) {
                     </p>
 
                     <p className="text-xs text-muted-foreground mt-4 uppercase tracking-wider font-medium">
-                        Supports PNG, JPG, WEBP, AVIF
+                        {description}
                     </p>
                 </div>
 
